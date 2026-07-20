@@ -1422,7 +1422,7 @@ export default function App() {
                 ) : (
                   <>
                     <RefreshCw className="h-3.5 w-3.5 text-black" />
-                    <span>Sincronizar Planilla</span>
+                    <span>Actualizar</span>
                   </>
                 )}
               </button>
