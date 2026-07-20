@@ -1,0 +1,6 @@
+{
+  "name": "Planilla de Parejas",
+  "description": "Aplicación web con pestañas para gestionar planillas de categorías y parejas con filas dinámicas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
