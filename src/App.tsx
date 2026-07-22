@@ -51,6 +51,17 @@ interface Category {
   rows: Row[];
 }
 
+interface InfoItem {
+  id: string;
+  type: 'title' | 'paragraph';
+  text: string;
+}
+
+const DEFAULT_INFO_ITEMS: InfoItem[] = [
+  { id: 'info-1', type: 'title', text: 'INFORMACIÓN DEL TORNEO' },
+  { id: 'info-2', type: 'paragraph', text: 'Bienvenido a la sección de información oficial del torneo. Aquí se publicarán los reglamentos, horarios y avisos importantes.' }
+];
+
 const DEFAULT_CATEGORIES: Category[] = [
   {
     id: 'cat-1',
@@ -179,15 +190,28 @@ function extractSpreadsheetId(url: string): string | null {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'parejas' | 'tab2'>('tab2');
+  const [activeTab, setActiveTab] = useState<'parejas' | 'tab2' | 'info'>('tab2');
+  const [infoItems, setInfoItems] = useState<InfoItem[]>(() => {
+    const saved = localStorage.getItem('parejas_info_items');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        console.error('Error parsing info items:', e);
+      }
+    }
+    return DEFAULT_INFO_ITEMS;
+  });
+  const [newInfoText, setNewInfoText] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showScriptGuide, setShowScriptGuide] = useState(false);
   const [copiedScript, setCopiedScript] = useState(false);
   const [sheetsUrl, setSheetsUrl] = useState(() => {
     const saved = localStorage.getItem('parejas_sheets_url');
-    if (!saved || saved.includes('AKfycbzjZ3xoMiaQZ71_ceoRuvN-M5YSaHsCBfoO7RlULEQ5YCWt_21Pwi0QptpRjcqBJ7KY') || saved.includes('AKfycbwKJX3xCnoSgnimqo4eEUDHj-10uccRKIDMqFChagnJH8_xaG2OERbbd1SdFAwBCfGT')) {
-      return 'https://script.google.com/macros/s/AKfycbxFYXTY0QrK4nCDoPGKyuf9ew1CHZp7uh1daBd_Wi3GcndXU310nedOb4RhJBz5Q7u9/exec';
+    if (!saved || !saved.includes('AKfycbyrRXT9q_xDH7pQmV_JI5xvjvo8rZxLsYdSybJ4w1bHGoyPF1UWG2MSHKJB4rpBECMPHQ')) {
+      return 'https://script.google.com/macros/s/AKfycbyrRXT9q_xDH7pQmV_JI5xvjvo8rZxLsYdSybJ4w1bHGoyPF1UWG2MSHKJB4rpBECMPHQ/exec';
     }
     return saved;
   });
@@ -309,6 +333,42 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('parejas_playoffs', JSON.stringify(playoffs));
   }, [playoffs]);
+
+  useEffect(() => {
+    localStorage.setItem('parejas_info_items', JSON.stringify(infoItems));
+  }, [infoItems]);
+
+  const handleAddInfoItem = (type: 'title' | 'paragraph') => {
+    const cleanText = newInfoText.trim();
+    if (!cleanText) return;
+    const newItem: InfoItem = {
+      id: `info-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      type,
+      text: cleanText
+    };
+    setInfoItems(prev => [...prev, newItem]);
+    setNewInfoText('');
+  };
+
+  const handleUpdateInfoItem = (id: string, text: string) => {
+    setInfoItems(prev => prev.map(item => item.id === id ? { ...item, text } : item));
+  };
+
+  const handleRemoveInfoItem = (id: string) => {
+    setInfoItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const handleMoveInfoItem = (index: number, direction: -1 | 1) => {
+    setInfoItems(prev => {
+      const newIndex = index + direction;
+      if (newIndex < 0 || newIndex >= prev.length) return prev;
+      const copy = [...prev];
+      const temp = copy[index];
+      copy[index] = copy[newIndex];
+      copy[newIndex] = temp;
+      return copy;
+    });
+  };
 
   useEffect(() => {
     if (!isEditMode && activeTab === 'parejas') {
@@ -849,7 +909,8 @@ export default function App() {
       // Prepare rawState for perfect loss-less backup & import
       const rawState = {
         categories,
-        playoffs
+        playoffs,
+        infoItems
       };
 
       // POST to Google Apps Script.
@@ -954,6 +1015,9 @@ export default function App() {
           setPlayoffs(parsedState.playoffs);
         } else {
           setPlayoffs({});
+        }
+        if (parsedState.infoItems && Array.isArray(parsedState.infoItems)) {
+          setInfoItems(parsedState.infoItems);
         }
       } else if (Array.isArray(parsedState)) {
         setCategories(parsedState);
@@ -1364,6 +1428,18 @@ export default function App() {
             id="tab-btn-p2"
           >
             CATEGORÍAS
+          </button>
+
+          <button
+            onClick={() => setActiveTab('info')}
+            className={`h-full flex items-center font-medium tracking-widest cursor-pointer px-3 text-xs md:text-sm transition-all border-b-2 uppercase ${
+              activeTab === 'info'
+                ? 'border-[#c5a059] text-[#c5a059]'
+                : 'border-transparent text-white/30 hover:text-white/50'
+            }`}
+            id="tab-btn-info"
+          >
+            INFO
           </button>
         </div>
         
@@ -2264,6 +2340,191 @@ export default function App() {
             </motion.div>
           )}
 
+          {activeTab === 'info' && (
+            <motion.div
+              key="info-tab"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-6"
+              id="tab-content-info"
+            >
+              {/* Header */}
+              <div className="border-b border-white/10 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl md:text-3xl font-bold uppercase tracking-wider text-white" id="info-tab-title">
+                    INFORMACIÓN
+                  </h1>
+                  <p className="text-xs text-neutral-400 font-mono tracking-widest uppercase mt-1">
+                    {isEditMode ? 'Gestión de títulos y párrafos informativos' : 'Avisos y detalles del torneo'}
+                  </p>
+                </div>
+                {isEditMode && (
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1 bg-amber-400/10 text-amber-400 border border-amber-400/20 text-[10px] font-mono font-bold uppercase rounded-sm">
+                      Modo Edición Activo
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Controls in Edit Mode for adding Title or Paragraph */}
+              {isEditMode && (
+                <div className="bg-[#141414] border border-[#c5a059]/30 rounded-sm p-4 md:p-6 space-y-4 shadow-lg" id="info-edit-controls">
+                  <h2 className="text-xs font-mono font-bold text-[#c5a059] uppercase tracking-widest flex items-center gap-2">
+                    <Plus className="h-4 w-4" /> Agregar Nuevo Elemento
+                  </h2>
+
+                  <div className="flex flex-col sm:flex-row gap-3 items-stretch">
+                    <input
+                      type="text"
+                      placeholder="Escriba aquí el texto del título o párrafo..."
+                      value={newInfoText}
+                      onChange={(e) => setNewInfoText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleAddInfoItem('paragraph');
+                        }
+                      }}
+                      className="flex-1 px-4 py-2.5 bg-neutral-900 border border-white/10 text-white rounded-sm text-sm focus:outline-none focus:border-[#c5a059] transition-all placeholder:text-white/20"
+                      id="info-new-text-input"
+                    />
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleAddInfoItem('title')}
+                        disabled={!newInfoText.trim()}
+                        className="px-4 py-2.5 bg-[#c5a059] hover:bg-[#d4b476] disabled:opacity-40 disabled:hover:bg-[#c5a059] text-black font-extrabold text-xs uppercase tracking-wider rounded-sm transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                        id="btn-add-title"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>+ Título (Negrita)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleAddInfoItem('paragraph')}
+                        disabled={!newInfoText.trim()}
+                        className="px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 disabled:opacity-40 disabled:hover:bg-neutral-800 text-white font-bold text-xs uppercase tracking-wider rounded-sm border border-white/10 transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                        id="btn-add-paragraph"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>+ Párrafo</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Display List of Titles and Paragraphs sequentially */}
+              <div className="bg-[#111] border border-white/10 rounded-sm p-6 md:p-10 shadow-2xl space-y-6">
+                {infoItems.length === 0 ? (
+                  <div className="text-center py-12 border border-dashed border-white/10 text-neutral-500 rounded-sm">
+                    <p className="text-sm font-bold uppercase tracking-wider text-neutral-400">No hay información registrada</p>
+                    {isEditMode ? (
+                      <p className="text-xs mt-1 text-neutral-500">Escriba un texto arriba y presione &quot;+ Título&quot; o &quot;+ Párrafo&quot; para agregarlo.</p>
+                    ) : (
+                      <p className="text-xs mt-1 text-neutral-500">Próximamente se publicará la información del torneo.</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {infoItems.map((item, index) => (
+                      <div 
+                        key={item.id} 
+                        className={`relative transition-all rounded-sm ${
+                          isEditMode 
+                            ? 'p-4 bg-neutral-900/80 border border-white/10 hover:border-[#c5a059]/40' 
+                            : ''
+                        }`}
+                        id={`info-item-${item.id}`}
+                      >
+                        {isEditMode && (
+                          <div className="flex items-center justify-between mb-3 pb-2 border-b border-white/5 font-mono text-[10px] text-white/40 uppercase tracking-widest">
+                            <span className="flex items-center gap-2">
+                              <span className={`w-2 h-2 rounded-full ${item.type === 'title' ? 'bg-[#c5a059]' : 'bg-neutral-400'}`}></span>
+                              {item.type === 'title' ? 'Título (Negrita)' : 'Párrafo (Sin Negrita)'}
+                            </span>
+
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleMoveInfoItem(index, -1)}
+                                disabled={index === 0}
+                                className="px-2 py-0.5 bg-neutral-800 hover:bg-neutral-700 disabled:opacity-20 text-white rounded text-xs transition cursor-pointer"
+                                title="Mover arriba"
+                              >
+                                ▲
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleMoveInfoItem(index, 1)}
+                                disabled={index === infoItems.length - 1}
+                                className="px-2 py-0.5 bg-neutral-800 hover:bg-neutral-700 disabled:opacity-20 text-white rounded text-xs transition cursor-pointer"
+                                title="Mover abajo"
+                              >
+                                ▼
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveInfoItem(item.id)}
+                                className="ml-2 px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded transition border border-red-500/20 flex items-center gap-1 text-[10px] font-bold cursor-pointer"
+                                title="Eliminar elemento"
+                                id={`btn-delete-info-${item.id}`}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                <span>Eliminar</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Content rendering */}
+                        {isEditMode ? (
+                          <div>
+                            {item.type === 'title' ? (
+                              <input
+                                type="text"
+                                value={item.text}
+                                onChange={(e) => handleUpdateInfoItem(item.id, e.target.value)}
+                                className="w-full px-3 py-2 bg-neutral-950 border border-white/10 text-[#c5a059] font-bold text-lg md:text-xl rounded-sm focus:outline-none focus:border-[#c5a059]"
+                                placeholder="Título..."
+                              />
+                            ) : (
+                              <textarea
+                                value={item.text}
+                                rows={3}
+                                onChange={(e) => handleUpdateInfoItem(item.id, e.target.value)}
+                                className="w-full px-3 py-2 bg-neutral-950 border border-white/10 text-neutral-200 font-normal text-sm md:text-base leading-relaxed rounded-sm focus:outline-none focus:border-[#c5a059]"
+                                placeholder="Párrafo..."
+                              />
+                            )}
+                          </div>
+                        ) : (
+                          <div>
+                            {item.type === 'title' ? (
+                              <h2 className="font-bold text-lg md:text-2xl text-[#c5a059] tracking-wide uppercase">
+                                {item.text}
+                              </h2>
+                            ) : (
+                              <p className="font-normal text-sm md:text-base text-neutral-200 leading-relaxed whitespace-pre-line">
+                                {item.text}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+
 
         </AnimatePresence>
       </main>
@@ -2754,8 +3015,42 @@ function exportDataToSpreadsheet(spreadsheetId, categories, rawState) {
     rawSheet.getRange(row, 1).setValue(jsonStr.substring(i, i + chunkSize));
     row++;
   }
+
+  // 1. Hoja INFO para Títulos y Párrafos
+  var infoItems = (rawState && rawState.infoItems) ? rawState.infoItems : [];
+  var infoSheetName = "INFO";
+  var infoSheet = ss.getSheetByName(infoSheetName);
+  if (infoSheet) {
+    infoSheet.clear();
+  } else {
+    infoSheet = ss.insertSheet(infoSheetName);
+  }
+  sheetsAffected.push(infoSheetName);
+
+  var infoHeaders = ["TIPO", "TEXTO"];
+  infoSheet.getRange(1, 1, 1, 2).setValues([infoHeaders])
+    .setFontWeight("bold")
+    .setBackground("#c5a059")
+    .setFontColor("#000000")
+    .setHorizontalAlignment("center");
+
+  var infoRows = [];
+  for (var infIdx = 0; infIdx < infoItems.length; infIdx++) {
+    var item = infoItems[infIdx];
+    if (!item) continue;
+    var tipoStr = (item.type === 'title' || item.type === 'titulo') ? 'titulo' : 'parrafo';
+    infoRows.push([tipoStr, item.text || '']);
+  }
+
+  if (infoRows.length > 0) {
+    infoSheet.getRange(2, 1, infoRows.length, 2).setValues(infoRows);
+    infoSheet.getRange(1, 1, infoRows.length + 1, 2).setBorder(true, true, true, true, true, true);
+  }
+  try {
+    infoSheet.autoResizeColumns(1, 2);
+  } catch (e) {}
   
-  // Procesamos cada categoría
+  // 2. Procesamos cada categoría
   for (var c = 0; c < categories.length; c++) {
     var cat = categories[c];
     if (!cat) continue;
@@ -2793,7 +3088,7 @@ function exportDataToSpreadsheet(spreadsheetId, categories, rawState) {
     var rowsToInsert = [];
     var catNameLower = (cat.name || "").toString().toLowerCase().trim();
     
-    // 1. Grupos con resultados y estadísticas (información de las planillas)
+    // Grupos con resultados y estadísticas (información de las planillas)
     var catGroups = cat.groups || [];
     for (var g = 0; g < catGroups.length; g++) {
       var gr = catGroups[g];
@@ -2837,7 +3132,7 @@ function exportDataToSpreadsheet(spreadsheetId, categories, rawState) {
       }
     }
     
-    // 2. Playoffs (Fase Eliminatoria)
+    // Playoffs (Fase Eliminatoria)
     var catPlayoffs = cat.playoffs || [];
     for (var p = 0; p < catPlayoffs.length; p++) {
       var pm = catPlayoffs[p];
@@ -2914,12 +3209,32 @@ function importDataFromSpreadsheet(spreadsheetId) {
   var sheets = ss.getSheets();
   var categoriesList = [];
   var playoffsMap = {};
+  var fallbackInfoItems = [];
+
+  var infoSheet = ss.getSheetByName("INFO");
+  if (infoSheet) {
+    var infoLastRow = infoSheet.getLastRow();
+    if (infoLastRow >= 2) {
+      var infoVals = infoSheet.getRange(2, 1, infoLastRow - 1, 2).getValues();
+      for (var infI = 0; infI < infoVals.length; infI++) {
+        var tRaw = (infoVals[infI][0] || '').toString().toLowerCase().trim();
+        var txt = (infoVals[infI][1] || '').toString();
+        if (txt) {
+          fallbackInfoItems.push({
+            id: 'info-' + Date.now() + '-' + infI,
+            type: (tRaw === 'titulo' || tRaw === 'title') ? 'title' : 'paragraph',
+            text: txt
+          });
+        }
+      }
+    }
+  }
   
   for (var s = 0; s < sheets.length; s++) {
     var sheet = sheets[s];
     var sheetName = sheet.getName();
     
-    if (sheetName === rawSheetName || sheetName.indexOf("__") === 0) continue;
+    if (sheetName === rawSheetName || sheetName === "INFO" || sheetName.indexOf("__") === 0) continue;
     
     var lastRow = sheet.getLastRow();
     if (lastRow < 2) continue;
@@ -2997,7 +3312,8 @@ function importDataFromSpreadsheet(spreadsheetId) {
   
   return {
     categories: categoriesList,
-    playoffs: playoffsMap
+    playoffs: playoffsMap,
+    infoItems: fallbackInfoItems
   };
 }
 `;
