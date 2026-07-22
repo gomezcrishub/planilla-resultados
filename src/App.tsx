@@ -65,7 +65,7 @@ const DEFAULT_INFO_ITEMS: InfoItem[] = [
 const DEFAULT_CATEGORIES: Category[] = [
   {
     id: 'cat-1',
-    name: 'PAREJA PRINCIPAL',
+    name: 'por favor actualice la pagina',
     rows: Array(15).fill(null).map(() => ({ text: '', group: '' }))
   }
 ];

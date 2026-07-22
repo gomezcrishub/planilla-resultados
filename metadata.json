@@ -1,5 +1,5 @@
 {
-  "name": "Planilla de Parejas",
+  "name": "Torneo Todas contra el Vidrio",
   "description": "Aplicación web con pestañas para gestionar planillas de categorías y parejas con filas dinámicas.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
